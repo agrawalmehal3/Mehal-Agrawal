@@ -1,0 +1,250 @@
+---
+title: "Project 2"
+author: "Mehal Agrawal"
+date: "2023-11-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(readr)
+```
+
+# **1) Introduction**
+
+This dataset analyzes the airplane landings at SFO International Airport. The data has been obtained from DataSF, a website that tracks different types of data in San Francisco. This data is publicly available to help enhance decision making. The dataset was received from [here](https://data.sfgov.org/Transportation/Air-Traffic-Landings-Statistics/fpux-q53t). I picked this dataset because I love to travel and have been to SFO many times as it is my local airport. I was interested in analyzing the air traffic at SFO in relation to where the flight is departing from, the total weight of the flight, the type of aircraft, and the manufacturer of the aircraft.
+
+![Bills, Terry. "San Francisco Airport's Dynamic Twin Has Transformed Operations." Esri, 21 Oct. 2021, esri.com/about/newsroom/blog/san-francisco-airport-bim-gis-processes/. Accessed 07 Nov. 2023.](/Users/mehalagrawal/Downloads/SFO.jpeg)
+
+```{r, message=FALSE}
+#importing data set
+planes <- read_csv("MonthlyLandingsData_200507_to_201603.csv")
+```
+
+# **2) Data Preparation**
+
+I downloaded the csv file and then imported it into the Rmarkdown. As for processing, the main step I had to take was renaming the variables so that there were no spaces in them. I made 3 new variables. The first one was "Total_Landed_Weight_In_Millions." I made this variable because the original variable had values that were very big and would be harder to handle later on in terms of graphing and analyzing. The second variable I made was "Continent." I made this variable because my report investigates the relationship between the aircraft manufacturer and continent. The last variable I created was a month variable which is later investigated in this report. A challenge I faced while preparing my data was the amount of data there is in the data set. I had to take time to understand each variable and how it functions in the data set. In terms of NA values, I dropped the rows that contained them. This is because I would not be able to analyze these rows. My data set now has 16,115 observations with 16 variables.
+
+```{r, message=FALSE}
+
+#renaming variables and replacing spaces with underscores 
+planes <- planes %>%
+  rename_with(~ gsub(" ", "_", .), everything())
+planes2 <- na.omit(planes)
+
+#Creating new variable 'Continent
+n <- nrow(planes2)
+planes2$Continent <- NA
+
+for (i in 1:n) {
+  if (str_detect(planes2$GEO_Region[i], "US|Mexico|Canada|Central America")) {
+    planes2$Continent[i] <- "North America"
+  }
+  if (str_detect(planes2$GEO_Region[i], "Asia|Middle East")) {
+    planes2$Continent[i] <- "Asia"
+  }
+  if (str_detect(planes2$GEO_Region[i], "Europe")) {
+    planes2$Continent[i] <- "Europe"
+  }
+  if (str_detect(planes2$GEO_Region[i], "South America")) {
+    planes2$Continent[i] <- "South America"
+  }
+  if (str_detect(planes2$GEO_Region[i], "Australia / Oceania")) {
+    planes2$Continent[i] <- "Australia"
+  }
+}
+
+#creating new variable "Month"
+planes2 <- mutate(planes2, Month= str_sub(planes2$Activity_Period, 5,6))
+
+#create new variable "Total_Landed_Weight_In_Millions
+planes2 <- mutate(planes2, Total_Landed_Weight_In_Millions= round(planes2$Total_Landed_Weight/1000000,3))
+
+write_csv(planes2, "/Users/mehalagrawal/Downloads/planes2.csv")
+
+```
+
+# **3) Variable Descriptions**
+
+```{r, message=FALSE}
+#Creating table for variables 
+data <- data.frame(
+  Name = c("Activity_Period","Operating_Airline", "Operating_Airline", "Published_Airline", "Published_Airline_IATA_Code", "GEO_Summary", "GEO_Region","Landing_Aircraft_Type", "Aircraft_Body_Type", "Aircraft_Manufacturer", "Aircraft_Model", "Aircraft_Version", "Landing_Count", "Total_Landed_Weight", "Continent", "Month", "Total_Landed_Weight_In_Millions"),
+  Type = c("Numeric","Character","Character","Character","Character","Character","Character","Character","Character","Character","Character","Character","Numeric","Numeric","Character","Character","Numeric"),
+   Description = c(
+    "Year and month at which the landing activity took place", "Operator name of the aircraft with passenger, cargo, or landing activity", "International Air Transport Association two-letter designation for the Operating Airline", "Name of Airline that issues ticket and books revenue for aircraft","International Air Transport Association two-letter designation for the Publsihed Airline","Designates whehter the passenger, cargo, or landings activity in relation to SFO arrived from a domestic or international location","Detailed breakdown of Geo Summary designating the region from which the aircraft departed from","Type of aircraft landed (freighters, passenger, or combi)","Determines whether aircraft is a wide body, narrowbody, regional, or prpeller operated aircraft","Manufacturer name of aircraft","Model of aircraft designated by manufacturer","Variation of Aircraft Model (dash number) used to segregate uniqeu version of same model","Number of aircaft landings","Total Landed Weight","Continent from which aircraft departed from","Coresponding Month for Activity","Total Landed Weight In Millions"
+  )
+)
+#formatting table of variables 
+table_with_paragraphs <- kable(data, "html", escape = FALSE) %>%
+  kable_styling("striped", full_width = FALSE)
+table_with_paragraphs
+```
+
+# **4) Univariate Analyses**
+
+```{r, message=FALSE}
+planes_ggplot= ggplot(planes2)
+```
+
+### Graph 1
+
+```{r, message=FALSE}
+#histogram of Total Landed Weight in Millions
+planes_ggplot+ geom_histogram(aes(Total_Landed_Weight_In_Millions), col="seagreen", fill="lightblue") + labs(title="Total Landed Weight In Millions",x="Total Landed Weight (In Millions)", y= "Count")
+```
+
+This graph displayed a histogram of the Total Landed Weight In Millions for each plane type. The histogram is skewed right with a mean of `r round(mean(planes2$Total_Landed_Weight_In_Millions),2)`. The maximum total weight landed is `r round(max(planes2$Total_Landed_Weight_In_Millions),2)` and the minimum total landed weight in millions is `r round(min(planes2$Total_Landed_Weight_In_Millions),2)`.
+
+### Graph 2
+
+```{r, message=FALSE}
+#bar graph of domestic and international flights
+ggplot(planes2, aes(x = GEO_Summary)) +
+  geom_bar(aes(fill = factor(GEO_Summary)), position = "dodge") +
+  labs(title = "Domestic vs. International Flights",
+       x = "GEO Summary ",
+       y = "Count") +
+      guides(fill = guide_legend(title = NULL))
+
+```
+
+This bar graph shows the number of planes that arrived from a domestic location and the number of planes that arrived from an international location. `r sum(str_detect(planes2$GEO_Summary,"Domestic"))` arrived from a domestic location or `r round((sum(str_detect(planes2$GEO_Summary,"Domestic"))/16115),3)*100`% of planes. `r sum(str_detect(planes2$GEO_Summary,"International"))` or `r round((sum(str_detect(planes2$GEO_Summary,"International"))/16115),3)*100`% of planes arrived from an international location.
+
+### Graph 3
+
+```{r, message=FALSE}
+#histogram of landing count
+planes_ggplot+ geom_histogram(aes(Landing_Count), col="black", fill="pink") + labs(title="Landing Count Per Plane Type",x="Landing Count Per Plane Type", y="Count")
+```
+
+This histogram shows the landing count of each plane type at SFO Airport. It is skewed right with a mean of `r round(mean(planes2$Landing_Count),2)`. The maximum number of times a plane type landed is `r max(planes2$Landing_Count)`.
+
+### Graph 4
+
+```{r, message=FALSE}
+#bar graph of aircraft type
+ggplot(planes2, aes(x = Landing_Aircraft_Type)) +
+  geom_bar(aes(fill = factor(Landing_Aircraft_Type)), position = "dodge") +
+  labs(title = "Bar Graph of Aircraft Type",
+       x = "Aircraft Type",
+       y = "Count") +
+      guides(fill=guide_legend(title=NULL))
+```
+
+This bar graph shows the number of planes that are Combi, Freighter, or Passenger planes. As seen by the graph majority of the planes that landed are passenger aircrafts. `r sum(str_detect(planes2$Landing_Aircraft_Type,"Combi"))` are Combi or `r round((sum(str_detect(planes2$Landing_Aircraft_Type,"Combi"))/16115),3)*100`% of planes. `r sum(str_detect(planes2$Landing_Aircraft_Type,"Freighter"))` or `r round((sum(str_detect(planes2$Landing_Aircraft_Type,"Freighter"))/16115),3)*100`% of planes are freighter. `r sum(str_detect(planes2$Landing_Aircraft_Type,"Passenger"))` are Passenger or `r round((sum(str_detect(planes2$Landing_Aircraft_Type,"Passenger"))/16115),3)*100`% of planes.
+
+# **5) Multivariate Analyses**
+
+### Graph 1
+
+```{r, message=FALSE}
+#finding the proportion of international flights for each airline/ mean total weight landed
+airline <- unique(planes2$Published_Airline)
+n <- length(airline)
+
+prop_international <- c()
+avg_totalweight <- c()
+
+
+for(i in 1:n) {
+  avg_totalweight[i] <- mean(planes2$Total_Landed_Weight_In_Millions[planes2$Published_Airline==airline[i]])
+  plane_subset <- filter(planes2, planes2$Published_Airline==airline[i])
+  prop_international[i] <- sum(plane_subset$GEO_Summary=="International")/nrow(plane_subset)
+
+}
+#tibble for data 
+airplane <- tibble(Airline=airline, Proportion_International=prop_international, Average_Total_Weight= avg_totalweight)
+
+#graph of poportion of international flights versus the average total weight
+ggplot(airplane) + geom_point(aes(x=Proportion_International, y=Average_Total_Weight)) + labs(title= "Percentage of International vs Average Total Landing Weight", x= "Percentage of International", y= "Average Total Landing Weight")
+```
+
+This plot graphs the proportion of each airplane type that is international and its average total weight. The correlation coefficient is `r round(cor(airplane$Proportion_International, airplane$Average_Total_Weight),2)`. This means that there is a weak relationship between the proportion of international planes for each airline and its average weight.
+
+### Graph 2
+
+```{r, message=FALSE}
+
+#plot of manufacturer by continent
+planes_ggplot <- ggplot(planes2, aes(x = Continent, fill = Aircraft_Manufacturer)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Aircraft Manufacturers by Continent", x= "Continent", y= "Percentage") +guides(fill=guide_legend(title= "Aircraft Manufacturer"))
+planes_ggplot
+
+
+#proportion table of data 
+table <- prop.table(table(planes2$Continent,planes2$Aircraft_Manufacturer),1)
+rounded_table <- round(table, digits = 3)
+
+#formatting table of data
+table_df <- as.data.frame.matrix(rounded_table)
+kable(table_df, "html", caption = "Proportion of Aircraft Manufacturers by Continent") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+This graph is a contingency bar chart. It uses the variable "Continent" and graphs the continent the plane is coming from while filling the bar with the percentage of planes that are made by a specific manufacturer. By looking at the bar graph, most of the planes are manufactured by Boeing. After making a proportion table, the data showed that 100% of the planes from South America were manufactured by Boeing. Asia, however, had 3 different manufacturers. While Boeing made 92% of its planes, McDonnell Douglas and Airbus also maunfactured a small percentage of the planes. North America had the most diversity with 13 manufacturers.
+
+### Graph 3
+
+```{r, message=FALSE}
+
+#graph of aircraft body type and aicrraft type
+planes_ggplot <- ggplot(planes2, aes(x = Landing_Aircraft_Type, fill = Aircraft_Body_Type)) +
+  geom_bar(position = "fill") +
+  labs(title = "Landing Aircraft Type by Aircraft Body Type", x= "Landing Aircraft Type") + guides(fill=guide_legend(title= "Aircraft Body Type"))
+
+planes_ggplot
+
+#table of of aircraft body type and aircraft type
+table <- prop.table(table(planes2$Landing_Aircraft_Type,planes2$Aircraft_Body_Type),1)
+rounded_table <- round(table, digits = 3)
+
+#formatting table 
+table_df <- as.data.frame.matrix(rounded_table)
+kable(table_df, "html", caption = "Proportion of Aircraft Body Types by Landing Aircraft Type") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+
+```
+
+This graph is a contingency bar chart. It uses the variable "Landing_Aircraft_Type" and graphs the aircraft type while filling the bar with the percentage of body type. By looking at the bar graph, all of the combi planes have wide body types. Passenger has the most variation in air craft body types with all four types being represented. However, according to the table almost 50% of the passanger planes have narrow body types. Turbo Prop only makes up a mere 1% of passenger planes.
+
+### Graph 4
+
+```{r, message=FALSE}
+
+#plot of domestic and international flights by month
+ggplot(data=planes2) +geom_bar(aes(x=Month, fill=GEO_Summary), position="dodge") + guides(fill=guide_legend(title=NULL)) + labs(title= "Number of Domestic and International Flights by Month", x="Month", y= "Count")
+
+#table of domestic and international flights by month
+table <- prop.table(table(planes2$Month,planes2$GEO_Summary),1)
+rounded_table <- round(table, digits = 3)
+
+#formatting table
+table_df <- as.data.frame.matrix(rounded_table)
+kable(table_df, "html", caption = "Percentage of International or Domestic Flights each month") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+This bar graph displays the number of flights that came from an international or domesic location every month. The number of flights departing from a domestic location or international location is mostly even year around. However, during July there 51.1% of the flight are international and 48.9% are domestic. This might be because many people travel internationally during the summer. In addition, during November 51.8% of the flightes became domestic and 48.2% were international. This could be because many people fly to be with their family during Thanksgiving. However, this is only true for the Uniteed States so that's why there is an influx in domestic flights and not international flights.
+
+# **6) Reproducibility**
+To ensure reproducibility in my code I made sure that the csv file and picture were both uploaded to github. I made sure to comment my code so that it would easily traceable. I also tried to use packages that users would already have downloaded on their systems so that they would not have to install packages. I made my code sequential so that it would be easy to understand. 
+
+# **7) Choice Elements**
+The first choice element I included was formatting a string variable. All of my variable names included spaces in them and in order to reference them easily throughout the code, I changed the variable names to have underscores instead of spaces. I also created 3 new variables of interest. This was the Total Weight of the aircraft in millions, continent, and month. I created the first one because the weight values when recorded raw were ver large and would become hard to handle. I created a continent variable because I wanted to generalize the region variable further while analyzing the location an aircraft departed from. The last variable helped me analyze the relationship between domestic and international flights in relation to the month. I used string formatting here too. These elements showed up in the second section of my report. The third element I used was a loop. This showed up while I was creating my continent variable as well as when I was trying to find the percentage of international flights for each airline. I used if statements also while creating my continent variable. Finally, I used inline code throughout my report while describing statistics of graphs. 
+
+# **8) Conclusion**
+
+For Univariate graphs I graphed the Total Landed Weight in Millions, number of flights that were domestic or international, landing count, and the aircraft type. I expected the Total Landed Weight graph to be skewed right because most planes will have weights around the same amount and then it will taper off. I expected the amount of planes coming from a domestic or international location to be around the same because San Francisco is an airport that supports both international and domestic landings. For landing count per plane type the graph was skewed right. Finally, I expected the amount of passenger planes to be the most common aircraft type landing at SFO because it mostly supports passengers.
+
+For the Multivariate graphs I expected that there would be a positive correlation between the percentage of international planes and the average total landing weight. However, the graph had a correlation coefficient of 0.06 signifyng a very weak relationship. In the second graph the bar having planes departing from a region in North America had the most variation in aircraft manufacturers. I found it suprising that 100% of South America's aircrafts were manufactured by Boeing. I found it surprising that freighter planes had a variety in aircraft body types. I expectd it to be mostly wide body planes as they would be able to carry the most cargo. Finally, I expected the amount of international flights to be drastically more during the summer months because people travel more. However, the difference between the number of domestic and international flights was not as drastic as I expected. However the influx of domestic flights during November surprised me, but it made sense as many people travel to be with their families during Thanksgiving.
+
+# **9) References**
+
+"Air Traffic Landings Statistics: DataSF: City and County of San Francisco." Air Traffic Landings Statistics \| DataSF \| City and County of San Francisco, 20 Oct. 2023, data.sfgov.org/Transportation/Air-Traffic-Landings-Statistics/fpux-q53t.
